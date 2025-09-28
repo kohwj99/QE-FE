@@ -1,5 +1,5 @@
 import { ThemeProvider, CssBaseline, createTheme } from '@mui/material';
-import { QueryBuilderPage } from './components/pages/QueryBuilderPage';
+import { QueryWorkspace } from './components/pages/QueryWorkspace';
 
 const theme = createTheme({
   palette: {
@@ -38,7 +38,7 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <QueryBuilderPage />
+      <QueryWorkspace />
     </ThemeProvider>
   );
 }

@@ -2,26 +2,54 @@ import { Box, Paper, Typography } from '@mui/material';
 import { useState, useEffect } from 'react';
 import { TableSelector } from '../atoms/TableSelector';
 import { AddConditionButton } from '../atoms/AddConditionButton';
-import { mockTables } from '../../data/mockData';
+import { mockTables, mockColumns } from '../../data/mockData';
 import type { QueryNode, FieldType, CompositeNode, FieldNode } from '../../types/queryBuilder';
 import { CompositeQuery } from '../molecules/CompositeQuery';
 import { FieldQuery } from '../molecules/FieldQuery';
-import { ValidationErrors } from '../atoms/ValidationErrors';
 import GroupIcon from "@mui/icons-material/Group";
 import FilterListIcon from '@mui/icons-material/FilterList';
 
 interface QueryBuilderProps {
   onSave?: (query: QueryNode) => void;
+  initialQuery?: QueryNode;
 }
 
-export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onSave }) => {
+export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onSave, initialQuery }) => {
   const [selectedTable, setSelectedTable] = useState('');
-  const [query, setQuery] = useState<QueryNode | null>(null);
-  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [query, setQuery] = useState<QueryNode | null>(initialQuery || null);
+
+  // Initialize table if there's an initial query
+  useEffect(() => {
+    if (initialQuery) {
+      // Find first column in the query to determine table
+      const findFirstColumn = (node: QueryNode): string | null => {
+        if (node.type === 'field') {
+          return node.column;
+        } else {
+          for (const child of node.children) {
+            const column = findFirstColumn(child);
+            if (column) return column;
+          }
+          return null;
+        }
+      };
+
+      const firstColumn = findFirstColumn(initialQuery);
+      if (firstColumn) {
+        // Find which table this column belongs to
+        for (const [table, columns] of Object.entries(mockColumns)) {
+          const allColumns = Object.values(columns as Record<string, string[]>).flat();
+          if (allColumns.includes(firstColumn)) {
+            setSelectedTable(table);
+            break;
+          }
+        }
+      }
+    }
+  }, [initialQuery]);
   const [nodeErrors, setNodeErrors] = useState<{ [key: string]: string[] }>({});
   const [jsonOutput, setJsonOutput] = useState('');
 
-  // Update JSON output whenever query changes
   useEffect(() => {
     if (query) {
       const cleanedQuery = cleanQueryForOutput(query);
@@ -47,35 +75,70 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onSave }) => {
         children: node.children.map(child => cleanQueryForOutput(child))
       };
     } else {
-      // Field query
-      const typeMap = {
-        'STRING': 'StringQuery',
-        'NUMERIC': 'NumericQuery',
-        'BOOLEAN': 'BoolQuery',
-        'DATE': 'DateQuery'
-      };
-      
       return {
-        type: typeMap[node.fieldType as keyof typeof typeMap],
+        type: 'FieldQuery',
         column: node.column,
         operator: node.operator,
-        value: node.isNull ? null : node.value,
-        valueType: node.fieldType
+        value: ['IS_NULL', 'IS_NOT_NULL'].includes(node.operator) ? null : node.value,
+        valueType: node.fieldType?.toLowerCase()
       };
     }
   };
 
+  const validateFieldNode = (node: FieldNode): string[] => {
+    const errors: string[] = [];
+    if (!node.column) {
+      errors.push('Column is required');
+    }
+    if (!node.operator) {
+      errors.push('Operator is required');
+    }
+    if (!['IS_NULL', 'IS_NOT_NULL'].includes(node.operator) && !node.value) {
+      errors.push('Value is required');
+    }
+    return errors;
+  };
+
+  const validateCompositeNode = (node: CompositeNode): void => {
+    if (node.children.length === 0) {
+      setNodeErrors(prev => ({
+        ...prev,
+        [node.id]: ['At least one condition is required']
+      }));
+      return;
+    }
+
+    node.children.forEach(child => {
+      if (child.type === 'field') {
+        const errors = validateFieldNode(child);
+        if (errors.length > 0) {
+          setNodeErrors(prev => ({
+            ...prev,
+            [child.id]: errors
+          }));
+        } else {
+          setNodeErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors[child.id];
+            return newErrors;
+          });
+        }
+      } else {
+        validateCompositeNode(child);
+      }
+    });
+  };
+
   const createNewQuery = (type: 'composite' | 'field') => {
     if (type === 'composite') {
-      const compositeQuery: CompositeNode = {
+      setQuery({
         id: Date.now(),
         type: 'composite',
         operator: 'AND',
         children: []
-      };
-      setQuery(compositeQuery);
+      });
     } else {
-      const fieldQuery: FieldNode = {
+      setQuery({
         id: Date.now(),
         type: 'field',
         fieldType: null,
@@ -83,64 +146,48 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onSave }) => {
         operator: '',
         value: '',
         isNull: false
-      };
-      setQuery(fieldQuery);
+      });
     }
-  };
-
-  const validateQuery = (node: QueryNode): string[] => {
-    const errors: string[] = [];
-    const newNodeErrors: { [key: string]: string[] } = {};
-
-    if (node.type === 'composite') {
-      if (!node.children || node.children.length === 0) {
-        const error = 'Composite query must have at least one child condition';
-        errors.push(`${node.id}: ${error}`);
-        newNodeErrors[node.id] = [error];
-      } else {
-        node.children.forEach(child => {
-          const childErrors = validateQuery(child);
-          errors.push(...childErrors);
-        });
-      }
-    } else {
-      const nodeErrors: string[] = [];
-      if (!node.column) {
-        nodeErrors.push('Column must be selected');
-      }
-      if (!node.isNull && !node.value && node.operator) {
-        nodeErrors.push('Value is required (or check "Is Null" if intended)');
-      }
-      if (nodeErrors.length > 0) {
-        newNodeErrors[node.id] = nodeErrors;
-        errors.push(...nodeErrors.map(e => `${node.id}: ${e}`));
-      }
-    }
-
-    setNodeErrors(prev => ({ ...prev, ...newNodeErrors }));
-    return errors;
   };
 
   const handleSave = () => {
     if (!query) {
-      setValidationErrors(['No query to save']);
+      setNodeErrors({ root: ['No query to save'] });
       return;
     }
 
-    const errors = validateQuery(query);
-    setValidationErrors(errors);
+    setNodeErrors({});
 
-    if (errors.length === 0 && onSave) {
+    if (query.type === 'composite') {
+      validateCompositeNode(query);
+    } else {
+      const errors = validateFieldNode(query);
+      if (errors.length > 0) {
+        setNodeErrors({ [query.id]: errors });
+        return;
+      }
+    }
+
+    if (onSave) {
       onSave(query);
     }
   };
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: 'auto', p: 3 }}>
-      <Paper sx={{ p: 4, borderRadius: 2 }}>
+    <Box sx={{ width: '100%' }}>
+      <Paper 
+        elevation={0} 
+        sx={{ 
+          p: 4,
+          borderRadius: 3,
+          bgcolor: 'grey.50',
+          width: '100%'
+        }}
+      >
         <Typography variant="h4" gutterBottom>
           Query Builder
         </Typography>
+        
         <Typography variant="subtitle1" color="text.secondary" paragraph>
           Build complex queries with an intuitive visual interface
         </Typography>
@@ -185,13 +232,11 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onSave }) => {
                 node={query}
                 onUpdate={setQuery}
                 selectedTable={selectedTable}
-                hasErrors={!!nodeErrors[query.id]}
+                errors={nodeErrors[query.id] || []}
               />
             )}
           </Box>
         )}
-
-        <ValidationErrors errors={validationErrors} />
 
         {query && (
           <Box sx={{ display: 'flex', gap: 2, mt: 4 }}>
@@ -204,7 +249,6 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onSave }) => {
               label="Reset"
               onClick={() => {
                 setQuery(null);
-                setValidationErrors([]);
                 setNodeErrors({});
               }}
               color="error"
@@ -212,7 +256,6 @@ export const QueryBuilder: React.FC<QueryBuilderProps> = ({ onSave }) => {
           </Box>
         )}
 
-        {/* JSON Output */}
         {jsonOutput && (
           <Paper sx={{ mt: 4, p: 3, bgcolor: 'grey.50' }}>
             <Typography variant="h6" gutterBottom>

@@ -21,53 +21,89 @@ export const mockColumns = {
   }
 };
 
-export const operators = {
-  'EQUALS': {
+export const operators = [
+  {
+    value: 'IS_NULL',
     supportedFieldTypes: ['STRING', 'NUMERIC', 'BOOLEAN', 'DATE'],
-    supportedValueTypes: ['STRING', 'NUMERIC', 'BOOLEAN', 'DATE']
+    supportedValueTypes: [],
+    description: 'Checks if the field has no value'
   },
-  'NOT_EQUALS': {
+  {
+    value: 'IS_NOT_NULL',
     supportedFieldTypes: ['STRING', 'NUMERIC', 'BOOLEAN', 'DATE'],
-    supportedValueTypes: ['STRING', 'NUMERIC', 'BOOLEAN', 'DATE']
+    supportedValueTypes: [],
+    description: 'Checks if the field has any value'
   },
-  'CONTAINS': {
+  {
+    value: 'EQUALS',
+    supportedFieldTypes: ['STRING', 'NUMERIC', 'BOOLEAN', 'DATE'],
+    supportedValueTypes: ['STRING', 'NUMERIC', 'BOOLEAN', 'DATE'],
+    description: 'Checks if the field exactly matches the given value'
+  },
+  {
+    value: 'NOT_EQUALS',
+    supportedFieldTypes: ['STRING', 'NUMERIC', 'BOOLEAN', 'DATE'],
+    supportedValueTypes: ['STRING', 'NUMERIC', 'BOOLEAN', 'DATE'],
+    description: 'Checks if the field does not match the given value'
+  },
+  {
+    value: 'CONTAINS',
     supportedFieldTypes: ['STRING'],
-    supportedValueTypes: ['STRING']
+    supportedValueTypes: ['STRING'],
+    description: 'Checks if the field contains the given text'
   },
-  'STARTS_WITH': {
+  {
+    value: 'STARTS_WITH',
     supportedFieldTypes: ['STRING'],
-    supportedValueTypes: ['STRING']
+    supportedValueTypes: ['STRING'],
+    description: 'Checks if the field starts with the given text'
   },
-  'ENDS_WITH': {
+  {
+    value: 'ENDS_WITH',
     supportedFieldTypes: ['STRING'],
-    supportedValueTypes: ['STRING']
+    supportedValueTypes: ['STRING'],
+    description: 'Checks if the field ends with the given text'
   },
-  'GREATER_THAN': {
+  {
+    value: 'GREATER_THAN',
     supportedFieldTypes: ['NUMERIC', 'DATE'],
-    supportedValueTypes: ['NUMERIC', 'DATE']
+    supportedValueTypes: ['NUMERIC', 'DATE'],
+    description: 'Checks if the field is greater than the given value'
   },
-  'LESS_THAN': {
+  {
+    value: 'LESS_THAN',
     supportedFieldTypes: ['NUMERIC', 'DATE'],
-    supportedValueTypes: ['NUMERIC', 'DATE']
+    supportedValueTypes: ['NUMERIC', 'DATE'],
+    description: 'Checks if the field is less than the given value'
   },
-  'GREATER_EQUAL': {
+  {
+    value: 'GREATER_EQUAL',
     supportedFieldTypes: ['NUMERIC', 'DATE'],
-    supportedValueTypes: ['NUMERIC', 'DATE']
+    supportedValueTypes: ['NUMERIC', 'DATE'],
+    description: 'Checks if the field is greater than or equal to the given value'
   },
-  'LESS_EQUAL': {
+  {
+    value: 'LESS_EQUAL',
     supportedFieldTypes: ['NUMERIC', 'DATE'],
-    supportedValueTypes: ['NUMERIC', 'DATE']
+    supportedValueTypes: ['NUMERIC', 'DATE'],
+    description: 'Checks if the field is less than or equal to the given value'
   },
-  'DAY_OF_WEEK': {
+  {
+    value: 'DAY_OF_WEEK',
     supportedFieldTypes: ['DATE'],
-    supportedValueTypes: ['NUMERIC']
+    supportedValueTypes: ['NUMERIC'],
+    description: 'Matches the day of the week (1-7, where 1 is Monday)'
   },
-  'MONTH': {
+  {
+    value: 'MONTH',
     supportedFieldTypes: ['DATE'],
-    supportedValueTypes: ['NUMERIC']
+    supportedValueTypes: ['NUMERIC'],
+    description: 'Matches the month (1-12)'
   },
-  'YEAR': {
+  {
+    value: 'YEAR',
     supportedFieldTypes: ['DATE'],
-    supportedValueTypes: ['NUMERIC']
+    supportedValueTypes: ['NUMERIC'],
+    description: 'Matches the year'
   }
-};
+];

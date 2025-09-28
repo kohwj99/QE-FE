@@ -1,4 +1,5 @@
 import { Box, Card, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
+import { ValidationErrors } from '../atoms/ValidationErrors';
 import type { CompositeNode, QueryNode, FieldNode } from '../../types/queryBuilder';
 import { FieldQuery } from './FieldQuery';
 import { AddConditionButton } from '../atoms/AddConditionButton';
@@ -72,16 +73,20 @@ export const CompositeQuery: React.FC<CompositeQueryProps> = ({
     onUpdate({ ...node, operator: newOperator });
   };
 
+  const isEmpty = node.children.length === 0;
+  const showError = hasErrors || isEmpty;
+  const errorMessage = isEmpty ? ['At least one condition is required'] : nodeErrors[node.id] || [];
+
   return (
     <Card
       variant="outlined"
       sx={{
         p: 3,
         borderRadius: 2,
-        borderColor: hasErrors ? 'error.main' : node.operator === 'AND' ? 'info.main' : 'warning.main',
+        borderColor: showError ? 'error.main' : node.operator === 'AND' ? 'info.main' : 'warning.main',
         bgcolor: node.operator === 'AND' ? 'info.50' : 'warning.50',
         '&:hover': {
-          borderColor: hasErrors ? 'error.dark' : node.operator === 'AND' ? 'info.dark' : 'warning.dark',
+          borderColor: showError ? 'error.dark' : node.operator === 'AND' ? 'info.dark' : 'warning.dark',
         },
       }}
     >
@@ -128,15 +133,23 @@ export const CompositeQuery: React.FC<CompositeQueryProps> = ({
                 py: 1, 
                 px: 2, 
                 mb: 2,
-                display: 'inline-block',
-                borderRadius: 1,
-                bgcolor: node.operator === 'AND' ? 'info.main' : 'warning.main',
-                color: 'white',
-                fontWeight: 'medium',
-                fontSize: '0.875rem',
+                display: 'flex',
+                justifyContent: 'center',
+                width: '100%',
+                '& > span': {
+                  py: 1, 
+                  px: 3,
+                  borderRadius: 1,
+                  bgcolor: node.operator === 'AND' ? 'info.main' : 'warning.main',
+                  color: 'white',
+                  fontWeight: 'medium',
+                  fontSize: '0.875rem',
+                }
               }}
             >
-              {node.operator}
+              <span>
+                {node.operator}
+              </span>
             </Box>
           )}
           {child.type === 'composite' ? (
@@ -151,8 +164,9 @@ export const CompositeQuery: React.FC<CompositeQueryProps> = ({
             <FieldQuery
               node={child}
               onUpdate={(updatedChild) => updateChild(index, updatedChild)}
+              onDelete={() => removeChild(index)}
               selectedTable={selectedTable}
-              hasErrors={!!nodeErrors[child.id]}
+              errors={nodeErrors[child.id] || []}
             />
           )}
         </Box>
@@ -172,6 +186,11 @@ export const CompositeQuery: React.FC<CompositeQueryProps> = ({
           color="success"
         />
       </Box>
+      {showError && (
+        <Box sx={{ mt: 2 }}>
+          <ValidationErrors errors={errorMessage} />
+        </Box>
+      )}
     </Card>
   );
 };

@@ -1,39 +1,43 @@
-import { FormControl, InputLabel, MenuItem, Select, TextField, Box, Checkbox, FormControlLabel } from '@mui/material';
+import { FormControl, InputLabel, MenuItem, Select, TextField, Box, Typography, IconButton } from '@mui/material';
+import { ValidationErrors } from '../atoms/ValidationErrors';
 import { FieldNode } from '../../types/queryBuilder';
 import { mockColumns, operators } from '../../data/mockData';
 import { FieldTypeBadge } from '../atoms/FieldTypeBadge';
 import { Card } from '@mui/material';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 interface FieldQueryProps {
   node: FieldNode;
   selectedTable: string;
   onUpdate: (updatedNode: FieldNode) => void;
-  hasErrors?: boolean;
+  onDelete?: () => void;
+  errors?: string[];
 }
 
 export const FieldQuery: React.FC<FieldQueryProps> = ({
   node,
   selectedTable,
   onUpdate,
-  hasErrors = false,
+  onDelete,
+  errors = [],
 }) => {
-  const allColumns = selectedTable ? Object.values(mockColumns[selectedTable] || {}).flat() : [];
+  const allColumns: string[] = selectedTable ? Object.values(mockColumns[selectedTable as keyof typeof mockColumns] || {}).flat() : [];
   const availableOperators = node.fieldType
-    ? Object.keys(operators).filter(op => operators[op].supportedFieldTypes.includes(node.fieldType!))
+    ? operators.filter(op => op.supportedFieldTypes.includes(node.fieldType!))
     : [];
 
   const getValueInputType = () => {
     if (!node.fieldType || !node.operator) return 'text';
     
-    const operatorConfig = operators[node.operator];
+    const operatorConfig = operators.find(op => op.value === node.operator);
     if (!operatorConfig) return 'text';
     
     let valueType = node.fieldType;
     const matchingValueType = operatorConfig.supportedValueTypes.find(vt => vt === node.fieldType);
     if (matchingValueType) {
-      valueType = matchingValueType;
+      valueType = matchingValueType as 'STRING' | 'NUMERIC' | 'BOOLEAN' | 'DATE';
     } else if (operatorConfig.supportedValueTypes.length > 0) {
-      valueType = operatorConfig.supportedValueTypes[0];
+      valueType = operatorConfig.supportedValueTypes[0] as 'STRING' | 'NUMERIC' | 'BOOLEAN' | 'DATE';
     }
     
     switch (valueType) {
@@ -54,7 +58,11 @@ export const FieldQuery: React.FC<FieldQueryProps> = ({
       updatedNode.value = '';
     }
     if (field === 'operator') {
-      updatedNode.value = '';
+      if (['IS_NULL', 'IS_NOT_NULL'].includes(value)) {
+        updatedNode.value = 'null';
+      } else {
+        updatedNode.value = '';
+      }
     }
     
     onUpdate(updatedNode);
@@ -62,12 +70,12 @@ export const FieldQuery: React.FC<FieldQueryProps> = ({
 
   const getFieldTypeFromColumn = (table: string, column: string) => {
     if (!table || !column) return null;
-    const tableColumns = mockColumns[table];
+    const tableColumns = mockColumns[table as keyof typeof mockColumns];
     if (!tableColumns) return null;
     
     for (const [fieldType, columns] of Object.entries(tableColumns)) {
-      if (columns.includes(column)) {
-        return fieldType;
+      if ((columns as string[]).includes(column)) {
+        return fieldType as 'STRING' | 'NUMERIC' | 'BOOLEAN' | 'DATE';
       }
     }
     return null;
@@ -79,85 +87,105 @@ export const FieldQuery: React.FC<FieldQueryProps> = ({
       sx={{
         p: 3,
         borderRadius: 2,
-        borderColor: hasErrors ? 'error.main' : 'grey.300',
+        borderColor: errors.length > 0 ? 'error.main' : 'grey.300',
         '&:hover': {
-          borderColor: hasErrors ? 'error.dark' : 'primary.main',
+          borderColor: errors.length > 0 ? 'error.dark' : 'primary.main',
         },
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-        <Box sx={{ width: '8px', height: '8px', borderRadius: '50%', bgcolor: 'primary.main', mr: 1 }} />
-        <Box component="span" sx={{ fontWeight: 'medium' }}>Field Query</Box>
-        {node.fieldType && <FieldTypeBadge fieldType={node.fieldType} />}
-      </Box>
-
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 2 }}>
-        <FormControl fullWidth>
-          <InputLabel>Column</InputLabel>
-          <Select
-            value={node.column}
-            label="Column"
-            onChange={(e) => handleFieldUpdate('column', e.target.value)}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ width: '8px', height: '8px', borderRadius: '50%', bgcolor: 'primary.main' }} />
+          <Box component="span" sx={{ fontWeight: 'medium' }}>Field Query</Box>
+          {node.fieldType && <FieldTypeBadge fieldType={node.fieldType} />}
+        </Box>
+        {onDelete && (
+          <IconButton 
+            onClick={onDelete}
+            color="error"
+            size="small"
           >
-            <MenuItem value="">Select column...</MenuItem>
-            {allColumns.map(column => (
-              <MenuItem key={column} value={column}>{column}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-
-        <FormControl fullWidth>
-          <InputLabel>Operator</InputLabel>
-          <Select
-            value={node.operator}
-            label="Operator"
-            onChange={(e) => handleFieldUpdate('operator', e.target.value)}
-            disabled={!node.column}
-          >
-            <MenuItem value="">Select operator...</MenuItem>
-            {availableOperators.map(op => (
-              <MenuItem key={op} value={op}>{op.replace(/_/g, ' ')}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-
-        {getValueInputType() === 'select' ? (
-          <FormControl fullWidth>
-            <InputLabel>Value</InputLabel>
-            <Select
-              value={node.value}
-              label="Value"
-              onChange={(e) => handleFieldUpdate('value', e.target.value)}
-              disabled={!node.column || !node.operator || node.isNull}
-            >
-              <MenuItem value="">Select...</MenuItem>
-              <MenuItem value="true">True</MenuItem>
-              <MenuItem value="false">False</MenuItem>
-            </Select>
-          </FormControl>
-        ) : (
-          <TextField
-            label="Value"
-            type={getValueInputType()}
-            value={node.value}
-            onChange={(e) => handleFieldUpdate('value', e.target.value)}
-            disabled={!node.column || !node.operator || node.isNull}
-            fullWidth
-          />
+            <DeleteIcon />
+          </IconButton>
         )}
       </Box>
 
-      <FormControlLabel
-        control={
-          <Checkbox
-            checked={node.isNull}
-            onChange={(e) => handleFieldUpdate('isNull', e.target.checked)}
-            disabled={!node.column}
-          />
-        }
-        label="Is Null"
-        sx={{ mt: 2 }}
-      />
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 2 }}>
+          <FormControl fullWidth>
+            <InputLabel>Column</InputLabel>
+            <Select
+              value={node.column}
+              label="Column"
+              onChange={(e) => handleFieldUpdate('column', e.target.value)}
+            >
+              <MenuItem value="">Select column...</MenuItem>
+              {allColumns.map(column => (
+                <MenuItem key={column} value={column}>{column}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl fullWidth>
+            <InputLabel>Operator</InputLabel>
+            <Select
+              value={node.operator}
+              label="Operator"
+              onChange={(e) => handleFieldUpdate('operator', e.target.value)}
+              disabled={!node.column}
+            >
+              <MenuItem value="">Select operator...</MenuItem>
+              {availableOperators.map(op => (
+                <MenuItem 
+                  key={op.value} 
+                  value={op.value}
+                >
+                  {op.value.replace(/_/g, ' ')}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {getValueInputType() === 'select' ? (
+            <FormControl fullWidth>
+              <InputLabel>Value</InputLabel>
+              <Select
+                value={node.value}
+                label="Value"
+                onChange={(e) => handleFieldUpdate('value', e.target.value)}
+                disabled={!node.column || !node.operator || ['IS_NULL', 'IS_NOT_NULL'].includes(node.operator)}
+              >
+                <MenuItem value="">Select...</MenuItem>
+                <MenuItem value="true">True</MenuItem>
+                <MenuItem value="false">False</MenuItem>
+              </Select>
+            </FormControl>
+          ) : (
+            <TextField
+              label="Value"
+              type={getValueInputType()}
+              value={node.value}
+              onChange={(e) => handleFieldUpdate('value', e.target.value)}
+              disabled={!node.column || !node.operator || ['IS_NULL', 'IS_NOT_NULL'].includes(node.operator)}
+              fullWidth
+            />
+          )}
+        </Box>
+        
+        {node.operator && (
+          <Typography 
+            variant="caption" 
+            color="text.secondary"
+          >
+            {operators.find(op => op.value === node.operator)?.description}
+          </Typography>
+        )}
+      </Box>
+      {errors.length > 0 && (
+        <Box sx={{ mt: 2 }}>
+          <ValidationErrors errors={errors} />
+        </Box>
+      )}
     </Card>
   );
 };
